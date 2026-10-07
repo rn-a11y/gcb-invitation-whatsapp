@@ -78,6 +78,18 @@ textarea{
 #msg{
   height:170px
 }
+#copyMsg{
+  display:block;
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  background:#292929;
+  color:#fff
+}
+#copyMsg.ok{
+  background:#25D366;
+  color:#042b12
+}
 .note{
   font-size:12px;
   color:#888
@@ -149,9 +161,13 @@ button:disabled{
 }
 .fig-actions{
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(3,1fr);
   gap:5px;
   margin-top:5px
+}
+.mini.ok{
+  background:#25D366;
+  color:#042b12
 }
 .mini{
   padding:8px 4px;
@@ -287,15 +303,23 @@ Andri</textarea>
 
     <h2>
       Teks Pesan WhatsApp
-      <span class="count">tersimpan otomatis</span>
+      <span class="count">default setiap dibuka</span>
     </h2>
 
     <textarea id="msg" placeholder="Tulis teks pesan di sini"></textarea>
 
+    <button id="copyMsg" class="secondary">
+      SALIN TEKS
+    </button>
+
     <div class="note">
       Tulis <span class="token">[NAMA]</span> di posisi nama penerima —
       akan diganti otomatis (mis. “Halo Dominic!”).
-      Isi pesan ini disimpan di browser Anda.
+      Teks <b>tidak disimpan</b>: halaman yang dibuka ulang
+      selalu kembali ke teks default.
+      Pakai <b>SALIN TEKS</b> untuk menyimpan hasil editan Anda
+      di clipboard — masih ada setelah refresh,
+      tinggal tempel (Ctrl+V) kembali.
     </div>
 
   </div>
@@ -386,14 +410,9 @@ GCB 5th Anniversary.
 
 Sampai jumpa di sana! 🙏`;
 
-const MSG_KEY = "gcb_wa_message";
-
-
 function getMsgText(){
 
-  const v = localStorage.getItem(MSG_KEY);
-
-  return (v === null) ? MSG_DEFAULT : v;
+  return $("#msg").value;
 
 }
 
@@ -410,15 +429,54 @@ function msgFor(name){
 const $ = s => document.querySelector(s);
 
 
-$("#msg").value = getMsgText();
+/* teks pesan TIDAK disimpan —
+   selalu kembali ke default
+   setiap halaman dibuka. */
+try{ localStorage.removeItem("gcb_wa_message"); }
+catch(e){ }
 
-$("#msg").addEventListener(
-  "input",
-  () => localStorage.setItem(
-    MSG_KEY,
-    $("#msg").value
-  )
-);
+$("#msg").value = MSG_DEFAULT;
+
+
+/* tombol SALIN TEKS
+   (editan tersimpan di clipboard,
+   bukan di browser) */
+function flash(btn, txt, ok){
+
+  const old = btn.dataset.old || btn.textContent;
+
+  btn.dataset.old = old;
+
+  btn.textContent = txt;
+
+  btn.classList.toggle("ok", !!ok);
+
+  setTimeout(() => {
+
+    btn.textContent = old;
+
+    btn.classList.remove("ok");
+
+    delete btn.dataset.old;
+
+  }, 1600);
+
+}
+
+
+$("#copyMsg").onclick = async () => {
+
+  const ok = await copyText($("#msg").value);
+
+  flash(
+    $("#copyMsg"),
+    ok
+      ? "TEKS TERSALIN ✓ — TEMPALKAN SETELAH REFRESH"
+      : "GAGAL — COBA LAGI",
+    ok
+  );
+
+};
 
 
 /* =========================
@@ -769,7 +827,19 @@ async () => {
           () => copyImageOnly(i);
 
 
-        row.append(bWa, bCopy);
+        const bText =
+          document.createElement("button");
+
+        bText.className =
+          "mini secondary";
+
+        bText.textContent = "TEKS";
+
+        bText.onclick =
+          () => copyMsgFor(i, bText);
+
+
+        row.append(bWa, bCopy, bText);
 
         fig.append(
           a, cap, row, mkSentBadge()
@@ -876,6 +946,27 @@ async function copyText(text){
   catch(e){
     return false;
   }
+
+}
+
+
+/* tombol mini TEKS per gambar:
+   salin pesan yang sudah
+   dipersonalisasi untuk nama itu */
+async function copyMsgFor(i, btn){
+
+  const o = outputs[i];
+
+  if(!o) return;
+
+  const ok =
+    await copyText(msgFor(o.display));
+
+  flash(
+    btn,
+    ok ? "TEKS ✓" : "GAGAL",
+    ok
+  );
 
 }
 
